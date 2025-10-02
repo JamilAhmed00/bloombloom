@@ -1,6 +1,8 @@
 import { GlobeViewer } from "@/components/globe-viewer"
+import { InteractiveBloomMap } from "@/components/interactive-bloom-map"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Download, Share2 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ArrowLeft, Download, Share2, Globe, Map } from "lucide-react"
 import Link from "next/link"
 
 export default function GlobePage() {
@@ -18,8 +20,8 @@ export default function GlobePage() {
                 </Button>
               </Link>
               <div>
-                <h1 className="text-2xl font-bold">Interactive 3D Globe</h1>
-                <p className="text-sm text-muted-foreground">Global bloom hotspots and seasonal patterns</p>
+                <h1 className="text-2xl font-bold">Interactive Global Bloom Explorer</h1>
+                <p className="text-sm text-muted-foreground">Explore bloom zones and seasonal patterns worldwide</p>
               </div>
             </div>
 
@@ -39,7 +41,7 @@ export default function GlobePage() {
 
       {/* Main content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-7xl mx-auto space-y-6">
           <div className="space-y-2">
             <h2 className="text-3xl font-bold text-balance">Explore Global Bloom Patterns</h2>
             <p className="text-lg text-muted-foreground text-pretty">
@@ -48,7 +50,26 @@ export default function GlobePage() {
             </p>
           </div>
 
-          <GlobeViewer />
+          <Tabs defaultValue="interactive" className="w-full">
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="interactive">
+                <Map className="w-4 h-4 mr-2" />
+                Interactive Map
+              </TabsTrigger>
+              <TabsTrigger value="satellite">
+                <Globe className="w-4 h-4 mr-2" />
+                Satellite View
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="interactive" className="mt-6">
+              <InteractiveBloomMap />
+            </TabsContent>
+
+            <TabsContent value="satellite" className="mt-6">
+              <GlobeViewer />
+            </TabsContent>
+          </Tabs>
 
           {/* Info cards */}
           <div className="grid md:grid-cols-3 gap-6 mt-8">
