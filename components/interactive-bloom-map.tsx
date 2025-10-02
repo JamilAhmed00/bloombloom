@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -11,9 +11,14 @@ import {
   TrendingUp,
   Calendar,
   Droplets,
-  Sun,
   Wind,
   Thermometer,
+  Layers,
+  Navigation,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Satellite,
 } from "lucide-react"
 
 interface Country {
@@ -188,7 +193,12 @@ export function InteractiveBloomMap() {
   const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0])
   const [currentMonth, setCurrentMonth] = useState(3)
   const [isAnimating, setIsAnimating] = useState(false)
-  const [hoveredCountry, setHoveredCountry] = useState<string | null>(null)
+  const [mapType, setMapType] = useState<"roadmap" | "satellite" | "hybrid" | "terrain">("satellite")
+  const [showBloomLayer, setShowBloomLayer] = useState(true)
+  const [showWeatherLayer, setShowWeatherLayer] = useState(true)
+  const [mapZoom, setMapZoom] = useState(6)
+  const [mapKey, setMapKey] = useState(0)
+  const mapRef = useRef<HTMLDivElement>(null)
 
   const currentSeason = selectedCountry.bloomSeasons[currentMonth]
 
@@ -197,10 +207,19 @@ export function InteractiveBloomMap() {
     if (isAnimating) {
       interval = setInterval(() => {
         setCurrentMonth((prev) => (prev + 1) % 12)
-      }, 1000)
+      }, 1500)
     }
     return () => clearInterval(interval)
   }, [isAnimating])
+
+  useEffect(() => {
+    setMapKey((prev) => prev + 1)
+    if (mapRef.current) {
+      setTimeout(() => {
+        mapRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
+      }, 100)
+    }
+  }, [selectedCountry, mapType, mapZoom])
 
   const getIntensityColor = (intensity: number) => {
     if (intensity >= 0.8) return "rgb(239, 68, 68)"
@@ -224,7 +243,7 @@ export function InteractiveBloomMap() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold">Interactive Bloom Zone Map</h3>
-            <p className="text-sm text-muted-foreground">Select a country to explore bloom patterns throughout the year</p>
+            <p className="text-sm text-muted-foreground">Real-time Google Maps with bloom data overlays</p>
           </div>
           <Badge variant="outline" className="px-3 py-1">
             <MapPin className="w-3 h-3 mr-1" />
@@ -234,110 +253,256 @@ export function InteractiveBloomMap() {
 
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
-            <div className="relative rounded-lg border-2 border-primary/20 overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800 p-6 min-h-[500px]">
-              <svg viewBox="0 0 800 500" className="w-full h-full">
-                <defs>
-                  <radialGradient id="bloomGradient">
-                    <stop offset="0%" stopColor={getIntensityColor(currentSeason.intensity)} stopOpacity="0.8" />
-                    <stop offset="100%" stopColor={getIntensityColor(currentSeason.intensity)} stopOpacity="0.2" />
-                  </radialGradient>
-                </defs>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex gap-1 bg-muted rounded-lg p-1">
+                <Button
+                  size="sm"
+                  variant={mapType === "roadmap" ? "default" : "ghost"}
+                  onClick={() => setMapType("roadmap")}
+                  className="text-xs h-8"
+                >
+                  Map
+                </Button>
+                <Button
+                  size="sm"
+                  variant={mapType === "satellite" ? "default" : "ghost"}
+                  onClick={() => setMapType("satellite")}
+                  className="text-xs h-8"
+                >
+                  <Satellite className="w-3 h-3 mr-1" />
+                  Satellite
+                </Button>
+                <Button
+                  size="sm"
+                  variant={mapType === "hybrid" ? "default" : "ghost"}
+                  onClick={() => setMapType("hybrid")}
+                  className="text-xs h-8"
+                >
+                  Hybrid
+                </Button>
+                <Button
+                  size="sm"
+                  variant={mapType === "terrain" ? "default" : "ghost"}
+                  onClick={() => setMapType("terrain")}
+                  className="text-xs h-8"
+                >
+                  Terrain
+                </Button>
+              </div>
+              <Button
+                size="sm"
+                variant={showBloomLayer ? "default" : "outline"}
+                onClick={() => setShowBloomLayer(!showBloomLayer)}
+                className="text-xs h-8"
+              >
+                <Layers className="w-3 h-3 mr-1" />
+                Bloom Layer
+              </Button>
+              <Button
+                size="sm"
+                variant={showWeatherLayer ? "default" : "outline"}
+                onClick={() => setShowWeatherLayer(!showWeatherLayer)}
+                className="text-xs h-8"
+              >
+                <Thermometer className="w-3 h-3 mr-1" />
+                Weather
+              </Button>
+            </div>
 
-                <rect width="800" height="500" fill="url(#oceanGradient)" />
+            <div ref={mapRef} className="relative rounded-xl border-2 border-primary/20 overflow-hidden min-h-[650px] shadow-2xl bg-slate-900">
+              <iframe
+                key={mapKey}
+                src={`https://maps.google.com/maps?q=${selectedCountry.coordinates.lat},${selectedCountry.coordinates.lng}&t=${mapType === "roadmap" ? "m" : mapType === "satellite" ? "k" : mapType === "hybrid" ? "h" : "p"}&z=${mapZoom}&output=embed`}
+                width="100%"
+                height="650"
+                style={{ border: 0 }}
+                loading="lazy"
+                className="w-full"
+                title={`Google Map of ${selectedCountry.name}`}
+              />
 
-                {COUNTRIES.map((country) => {
-                  const x = ((country.coordinates.lng + 180) / 360) * 800
-                  const y = ((90 - country.coordinates.lat) / 180) * 500
-                  const season = country.bloomSeasons[currentMonth]
-                  const isSelected = selectedCountry.id === country.id
-                  const isHovered = hoveredCountry === country.id
-                  const size = isSelected ? 60 : isHovered ? 50 : 40
-
-                  return (
-                    <g
-                      key={country.id}
-                      onMouseEnter={() => setHoveredCountry(country.id)}
-                      onMouseLeave={() => setHoveredCountry(null)}
-                      onClick={() => setSelectedCountry(country)}
-                      className="cursor-pointer transition-all"
+              {showBloomLayer && (
+                <div className="absolute inset-0 pointer-events-none">
+                  <svg viewBox="0 0 100 100" className="w-full h-full" preserveAspectRatio="none">
+                    <defs>
+                      <radialGradient id={`bloom-${selectedCountry.id}-${currentMonth}`}>
+                        <stop offset="0%" stopColor={getIntensityColor(currentSeason.intensity)} stopOpacity="0.6" />
+                        <stop offset="40%" stopColor={getIntensityColor(currentSeason.intensity)} stopOpacity="0.3" />
+                        <stop offset="100%" stopColor={getIntensityColor(currentSeason.intensity)} stopOpacity="0" />
+                      </radialGradient>
+                      <filter id="glow">
+                        <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+                        <feMerge>
+                          <feMergeNode in="coloredBlur" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
+                    </defs>
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="30"
+                      fill={`url(#bloom-${selectedCountry.id}-${currentMonth})`}
+                      className="animate-pulse"
+                      style={{ animationDuration: "3s" }}
+                    />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="4"
+                      fill="white"
+                      filter="url(#glow)"
+                      className="drop-shadow-lg"
                     >
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r={size}
-                        fill={getIntensityColor(season.intensity)}
-                        opacity={isSelected ? 0.6 : 0.4}
-                        className="transition-all duration-300"
-                      />
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r={size * 0.7}
-                        fill={getIntensityColor(season.intensity)}
-                        opacity={isSelected ? 0.8 : 0.6}
-                        className="transition-all duration-300"
+                      <animate attributeName="r" values="4;6;4" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                  </svg>
+
+                  {COUNTRIES.filter((c) => c.id !== selectedCountry.id).map((country) => {
+                    const season = country.bloomSeasons[currentMonth]
+                    const deltaLng = country.coordinates.lng - selectedCountry.coordinates.lng
+                    const deltaLat = country.coordinates.lat - selectedCountry.coordinates.lat
+                    const distance = Math.sqrt(deltaLng * deltaLng + deltaLat * deltaLat)
+
+                    if (distance > 50) return null
+
+                    const x = 50 + (deltaLng / 30) * 50
+                    const y = 50 - (deltaLat / 30) * 50
+
+                    if (x < 0 || x > 100 || y < 0 || y > 100) return null
+
+                    return (
+                      <div
+                        key={country.id}
+                        className="absolute cursor-pointer hover:scale-125 transition-transform z-10"
+                        style={{
+                          left: `${x}%`,
+                          top: `${y}%`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedCountry(country)
+                        }}
                       >
-                        {(isSelected || isHovered) && (
-                          <animate
-                            attributeName="r"
-                            from={size * 0.7}
-                            to={size * 1.2}
-                            dur="2s"
-                            repeatCount="indefinite"
+                        <div className="relative pointer-events-auto">
+                          <div
+                            className="w-10 h-10 rounded-full animate-ping absolute opacity-30"
+                            style={{
+                              backgroundColor: getIntensityColor(season.intensity),
+                              animationDuration: "2s",
+                            }}
                           />
-                        )}
-                      </circle>
-                      <circle
-                        cx={x}
-                        cy={y}
-                        r={size * 0.4}
-                        fill="white"
-                        opacity={isSelected ? 1 : 0.8}
-                      />
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center relative shadow-lg border-2 border-white"
+                            style={{ backgroundColor: getIntensityColor(season.intensity) }}
+                          >
+                            <Flower2 className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
 
-                      {isSelected && (
-                        <text
-                          x={x}
-                          y={y - size - 10}
-                          textAnchor="middle"
-                          fill="white"
-                          fontSize="14"
-                          fontWeight="bold"
-                          className="pointer-events-none"
-                        >
-                          {country.name}
-                        </text>
-                      )}
-                    </g>
-                  )
-                })}
-              </svg>
-
-              <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm rounded-lg p-3 text-white">
-                <div className="text-xs font-medium mb-2">Bloom Intensity Scale</div>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: "rgb(239, 68, 68)" }} />
-                    <span className="text-xs">Peak (80-100%)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: "rgb(249, 115, 22)" }} />
-                    <span className="text-xs">High (60-80%)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: "rgb(234, 179, 8)" }} />
-                    <span className="text-xs">Moderate (40-60%)</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-full" style={{ backgroundColor: "rgb(34, 197, 94)" }} />
-                    <span className="text-xs">Low (20-40%)</span>
+              <div className="absolute top-4 left-4 bg-black/80 backdrop-blur-md rounded-xl p-4 text-white pointer-events-none shadow-2xl border border-white/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-4 h-4 text-primary" />
+                  <div className="text-base font-bold">{selectedCountry.name}</div>
+                </div>
+                <div className="text-xs text-white/70 mb-3">{MONTHS[currentMonth]} • {selectedCountry.continent}</div>
+                <div className="flex items-center gap-2 p-2 bg-white/10 rounded-lg">
+                  <div
+                    className="w-4 h-4 rounded-full animate-pulse"
+                    style={{ backgroundColor: getIntensityColor(currentSeason.intensity) }}
+                  />
+                  <div>
+                    <div className="text-xs font-medium">{getIntensityLabel(currentSeason.intensity)}</div>
+                    <div className="text-xs text-white/70">{Math.round(currentSeason.intensity * 100)}% Intensity</div>
                   </div>
                 </div>
               </div>
 
-              <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-sm rounded-lg px-4 py-2 text-white">
-                <div className="text-sm font-medium">{MONTHS[currentMonth]}</div>
-                <div className="text-xs text-white/70">{getIntensityLabel(currentSeason.intensity)}</div>
+              {showWeatherLayer && (
+                <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-md rounded-xl p-3 text-white text-xs space-y-2 pointer-events-none shadow-2xl border border-white/10">
+                  <div className="flex items-center gap-2 pb-2 border-b border-white/20">
+                    <Thermometer className="w-4 h-4 text-orange-400" />
+                    <span className="font-medium">Weather Data</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-white/70">Temperature</span>
+                    <span className="font-bold text-orange-400">{currentSeason.temperature}°C</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-white/70">Rainfall</span>
+                    <span className="font-bold text-blue-400">{currentSeason.rainfall}mm</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-white/70">Humidity</span>
+                    <span className="font-bold text-cyan-400">{currentSeason.humidity}%</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="absolute bottom-4 right-4 flex flex-col gap-2 pointer-events-auto z-20">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="w-10 h-10 p-0 shadow-xl hover:scale-110 transition-transform"
+                  onClick={() => setMapZoom(Math.min(18, mapZoom + 1))}
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="w-10 h-10 p-0 shadow-xl hover:scale-110 transition-transform"
+                  onClick={() => setMapZoom(Math.max(2, mapZoom - 1))}
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="w-10 h-10 p-0 shadow-xl hover:scale-110 transition-transform"
+                  onClick={() => setMapZoom(6)}
+                  title="Reset zoom"
+                >
+                  <Navigation className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div className="absolute bottom-4 left-4 bg-black/80 backdrop-blur-md rounded-xl p-3 text-white text-xs pointer-events-none shadow-2xl border border-white/10">
+                <div className="font-medium mb-2 flex items-center gap-2">
+                  <Layers className="w-3 h-3" />
+                  Bloom Intensity Scale
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full border-2 border-white shadow-lg" style={{ backgroundColor: "rgb(239, 68, 68)" }} />
+                    <span>Peak 80-100%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full border-2 border-white shadow-lg" style={{ backgroundColor: "rgb(249, 115, 22)" }} />
+                    <span>High 60-80%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full border-2 border-white shadow-lg" style={{ backgroundColor: "rgb(234, 179, 8)" }} />
+                    <span>Moderate 40-60%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded-full border-2 border-white shadow-lg" style={{ backgroundColor: "rgb(34, 197, 94)" }} />
+                    <span>Low 20-40%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="absolute top-1/2 right-4 -translate-y-1/2 bg-primary/95 backdrop-blur-md rounded-full px-4 py-2 text-white text-xs font-bold pointer-events-none shadow-2xl">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                  <span>LIVE</span>
+                </div>
               </div>
             </div>
 
@@ -372,7 +537,7 @@ export function InteractiveBloomMap() {
                 {MONTH_SHORT.map((month, index) => (
                   <span
                     key={month}
-                    className={currentMonth === index ? "text-primary font-medium" : ""}
+                    className={currentMonth === index ? "text-primary font-bold" : ""}
                   >
                     {month}
                   </span>
@@ -381,10 +546,10 @@ export function InteractiveBloomMap() {
 
               <div className="grid grid-cols-12 gap-1 mt-2">
                 {selectedCountry.bloomSeasons.map((season, index) => (
-                  <div
+                  <button
                     key={index}
-                    className={`h-8 rounded cursor-pointer transition-all ${
-                      currentMonth === index ? "ring-2 ring-primary ring-offset-2" : ""
+                    className={`h-10 rounded cursor-pointer transition-all hover:scale-105 ${
+                      currentMonth === index ? "ring-2 ring-primary ring-offset-2 shadow-lg" : "hover:opacity-80"
                     }`}
                     style={{ backgroundColor: getIntensityColor(season.intensity) }}
                     onClick={() => setCurrentMonth(index)}
@@ -396,45 +561,45 @@ export function InteractiveBloomMap() {
           </div>
 
           <div className="space-y-4">
-            <Card className="p-4 bg-gradient-to-br from-primary/5 to-secondary/5">
+            <Card className="p-4 bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold">{selectedCountry.name}</h4>
                 <Badge>{selectedCountry.continent}</Badge>
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-2 bg-background/50 rounded">
+                <div className="flex items-center justify-between p-3 bg-background/70 rounded-lg shadow-sm">
                   <div className="flex items-center gap-2">
                     <Flower2 className="w-4 h-4 text-primary" />
-                    <span className="text-sm">Bloom Level</span>
+                    <span className="text-sm font-medium">Bloom Level</span>
                   </div>
-                  <Badge style={{ backgroundColor: getIntensityColor(currentSeason.intensity) }}>
+                  <Badge className="font-bold" style={{ backgroundColor: getIntensityColor(currentSeason.intensity) }}>
                     {Math.round(currentSeason.intensity * 100)}%
                   </Badge>
                 </div>
 
-                <div className="flex items-center justify-between p-2 bg-background/50 rounded">
+                <div className="flex items-center justify-between p-3 bg-background/70 rounded-lg shadow-sm">
                   <div className="flex items-center gap-2">
                     <Thermometer className="w-4 h-4 text-orange-500" />
-                    <span className="text-sm">Temperature</span>
+                    <span className="text-sm font-medium">Temperature</span>
                   </div>
-                  <span className="text-sm font-medium">{currentSeason.temperature}°C</span>
+                  <span className="text-sm font-bold text-orange-500">{currentSeason.temperature}°C</span>
                 </div>
 
-                <div className="flex items-center justify-between p-2 bg-background/50 rounded">
+                <div className="flex items-center justify-between p-3 bg-background/70 rounded-lg shadow-sm">
                   <div className="flex items-center gap-2">
                     <Droplets className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm">Rainfall</span>
+                    <span className="text-sm font-medium">Rainfall</span>
                   </div>
-                  <span className="text-sm font-medium">{currentSeason.rainfall}mm</span>
+                  <span className="text-sm font-bold text-blue-500">{currentSeason.rainfall}mm</span>
                 </div>
 
-                <div className="flex items-center justify-between p-2 bg-background/50 rounded">
+                <div className="flex items-center justify-between p-3 bg-background/70 rounded-lg shadow-sm">
                   <div className="flex items-center gap-2">
                     <Wind className="w-4 h-4 text-cyan-500" />
-                    <span className="text-sm">Humidity</span>
+                    <span className="text-sm font-medium">Humidity</span>
                   </div>
-                  <span className="text-sm font-medium">{currentSeason.humidity}%</span>
+                  <span className="text-sm font-bold text-cyan-500">{currentSeason.humidity}%</span>
                 </div>
               </div>
             </Card>
@@ -446,12 +611,12 @@ export function InteractiveBloomMap() {
               </div>
               <div className="space-y-2">
                 {currentSeason.flowers.map((flower, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                  <div key={index} className="flex items-center gap-2 p-2 bg-muted/50 rounded-lg hover:bg-muted transition-colors">
                     <div
-                      className="w-2 h-2 rounded-full animate-pulse"
-                      style={{ backgroundColor: getIntensityColor(currentSeason.intensity) }}
+                      className="w-3 h-3 rounded-full animate-pulse"
+                      style={{ backgroundColor: getIntensityColor(currentSeason.intensity), animationDuration: "2s" }}
                     />
-                    <span className="text-sm">{flower}</span>
+                    <span className="text-sm font-medium">{flower}</span>
                   </div>
                 ))}
               </div>
@@ -464,7 +629,7 @@ export function InteractiveBloomMap() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {selectedCountry.topFlowers.map((flower, index) => (
-                  <Badge key={index} variant="outline">
+                  <Badge key={index} variant="outline" className="font-medium">
                     {flower}
                   </Badge>
                 ))}
@@ -472,34 +637,37 @@ export function InteractiveBloomMap() {
             </Card>
 
             <div className="grid grid-cols-2 gap-3">
-              <Card className="p-3 text-center">
-                <div className="text-2xl font-bold text-primary">{selectedCountry.avgTemperature}°C</div>
-                <div className="text-xs text-muted-foreground">Avg Temperature</div>
+              <Card className="p-3 text-center bg-gradient-to-br from-orange-500/10 to-orange-500/5">
+                <div className="text-2xl font-bold text-orange-500">{selectedCountry.avgTemperature}°C</div>
+                <div className="text-xs text-muted-foreground font-medium">Avg Temperature</div>
               </Card>
-              <Card className="p-3 text-center">
+              <Card className="p-3 text-center bg-gradient-to-br from-blue-500/10 to-blue-500/5">
                 <div className="text-2xl font-bold text-blue-500">{selectedCountry.avgRainfall}mm</div>
-                <div className="text-xs text-muted-foreground">Annual Rainfall</div>
+                <div className="text-xs text-muted-foreground font-medium">Annual Rainfall</div>
               </Card>
             </div>
           </div>
         </div>
       </Card>
 
-      <Card className="p-6">
-        <h4 className="font-semibold mb-4">Select Country</h4>
+      <Card className="p-6 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5">
+        <h4 className="font-semibold mb-4 flex items-center gap-2">
+          <MapPin className="w-4 h-4" />
+          Select Country to Explore
+        </h4>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {COUNTRIES.map((country) => (
             <Button
               key={country.id}
               variant={selectedCountry.id === country.id ? "default" : "outline"}
-              className="justify-start"
+              className="justify-start hover:scale-105 transition-transform"
               onClick={() => setSelectedCountry(country)}
             >
               <div
-                className="w-2 h-2 rounded-full mr-2 animate-pulse"
-                style={{ backgroundColor: getIntensityColor(country.bloomSeasons[currentMonth].intensity) }}
+                className="w-3 h-3 rounded-full mr-2 animate-pulse shadow-lg"
+                style={{ backgroundColor: getIntensityColor(country.bloomSeasons[currentMonth].intensity), animationDuration: "2s" }}
               />
-              {country.name}
+              <span className="font-medium">{country.name}</span>
             </Button>
           ))}
         </div>
